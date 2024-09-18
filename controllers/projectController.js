@@ -1,3 +1,4 @@
+const { Client } = require('pg');
 const client = require('../database');
 const { body, validationResult } = require('express-validator');
 
@@ -107,3 +108,70 @@ exports.getAllProjects = async (req, res) => {
         return res.status(500).json({ error: 'Error fetching projects' });
     }
 };
+
+const createPerformanceTable = async () => {
+    const createTableQuery = `
+      CREATE TABLE IF NOT EXISTS Performance (
+        PerformanceID SERIAL PRIMARY KEY,
+        ProjectID INT REFERENCES Projects(ProjectID),
+        Year SERIAL,
+        CashOut NUMERIC,
+        CashIn NUMERIC
+      );
+    `;
+    try {
+      await client.query(createTableQuery);
+      console.log('Performance table is ready');
+    } catch (error) {
+      console.error('Error creating table:', error);
+    }
+  };
+
+exports.addPerformance = async (req, res) => {
+    const { projectID, cashOut, cashIn } = req.body;
+  
+    if (!projectID || !cashOut || !cashIn) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+  
+    try {
+      await createPerformanceTable();
+      const insertQuery = `
+        INSERT INTO Performance (ProjectID, CashOut, CashIn)
+        VALUES ($1, $2, $3)
+        RETURNING *;
+      `;
+      const result = await client.query(insertQuery, [projectID, cashOut, cashIn]);
+      return res.status(201).json({ performance: result.rows[0] });
+    } catch (error) {
+      console.error('Error adding performance entry:', error);
+      return res.status(500).json({ error: 'Failed to add performance entry' });
+    }
+};
+
+exports.getPerformanceByProjectID = [
+    body('projectID').isInt().withMessage('ProjectID must be an integer'),
+  
+    async (req, res) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+      const { projectID } = req.body;
+      try {
+        const selectQuery = `
+          SELECT * FROM Performance WHERE ProjectID = $1;
+        `;
+        const result = await client.query(selectQuery, [projectID]);
+  
+        if (result.rows.length === 0) {
+          return res.status(404).json({ message: 'No performance records found for this project' });
+        }
+  
+        return res.status(200).json({ performance: result.rows });
+      } catch (error) {
+        console.error('Error fetching performance entries:', error.message);
+        return res.status(500).json({ error: 'Failed to fetch performance entries' });
+      }
+    }
+  ];

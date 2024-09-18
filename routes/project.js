@@ -6,5 +6,7 @@ const router = express.Router();
 
 router.post('/addProject',projectController.addProject);
 router.get('/getAllProjects',projectController.getAllProjects);
+router.post('/addPerformance',projectController.addPerformance);
+router.get('/getPerformance',projectController.getPerformanceByProjectID);
 
 module.exports = router;
