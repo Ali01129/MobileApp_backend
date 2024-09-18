@@ -2,8 +2,9 @@ const client = require('../database');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
+require('dotenv').config();
 
-JWT_SECRET = 'made-by-ali';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // Function to create admin table if it doesn't exist
 const createAdminTableIfNotExists = async () => {
