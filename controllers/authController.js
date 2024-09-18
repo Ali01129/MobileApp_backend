@@ -6,19 +6,21 @@ const { body, validationResult } = require('express-validator');
 JWT_SECRET='made-by-ali';
 
 const createUserTableIfNotExists = async () => {
-    const createTableQuery = `
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(100) NOT NULL,
-            email VARCHAR(100) UNIQUE NOT NULL,
-            password VARCHAR(255) NOT NULL,
-            phone VARCHAR(15) NOT NULL,
-            dob DATE NOT NULL,
-            accountStatus BOOLEAN DEFAULT TRUE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    `;
-
+  const createTableQuery = `
+  CREATE TABLE IF NOT EXISTS users (
+      userID SERIAL PRIMARY KEY,
+      email VARCHAR(100) UNIQUE NOT NULL,
+      password VARCHAR(255) NOT NULL,
+      name VARCHAR(100),
+      totalInvested DECIMAL(10, 2) DEFAULT 0,
+      totalProfit DECIMAL(10, 2) DEFAULT 0,
+      totalLoss DECIMAL(10, 2) DEFAULT 0,
+      dob DATE,
+      nationalID VARCHAR(50), -- SSN / Passport / National ID
+      profileStatus BOOLEAN DEFAULT FALSE, -- false means not completed
+      accountStatus BOOLEAN DEFAULT TRUE, -- true means active
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );`;
     try {
         await client.query(createTableQuery);
         console.log('Users table created or already exists.');
@@ -31,14 +33,11 @@ const createUserTableIfNotExists = async () => {
 //register user api
 exports.register = [
   // Validation checks
-  body('name').notEmpty().withMessage('Name is required'),
   body('email').isEmail().withMessage('Please enter a valid email address'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
-  body('phone').isMobilePhone().withMessage('Please enter a valid phone number'),
-  body('dob').isDate().withMessage('Please enter a valid date of birth'),
 
   async (req, res) => {
-    const { name, email, password, phone, dob } = req.body;
+    const { email, password } = req.body;
 
     // Handling validation errors
     const errors = validationResult(req);
@@ -63,8 +62,8 @@ exports.register = [
       const hashedPassword = await bcrypt.hash(password, salt);
 
       // Insert the new user into the database
-      const insertUserQuery = 'INSERT INTO users (name, email, password, phone, dob) VALUES ($1, $2, $3, $4, $5)';
-      const values = [name, email, hashedPassword, phone, dob];
+      const insertUserQuery = 'INSERT INTO users (email, password) VALUES ($1, $2)';
+      const values = [ email, hashedPassword];
       await client.query(insertUserQuery, values);
 
       // Creating token
@@ -122,4 +121,45 @@ exports.login = [
         return res.status(500).json({ error: 'Error logging in user' });
       }
     }
+];
+
+exports.googleAuth=[
+  // Validation checks
+  body('name').notEmpty().withMessage('Name is required'),
+  body('email').isEmail().withMessage('Email or password is incorrect'),
+  async(req,res)=>{
+    const {name,email}=req.body;
+    try{
+      // Checking if the user exists
+      const query = 'SELECT * FROM users WHERE email=$1';
+      const queryResult = await client.query(query, [email]);
+
+      if(queryResult.rowCount===1){
+        const pass = queryResult.rows[0].password;
+          const result = await bcrypt.compare(email, pass);
+          if (result) {
+            const token = jwt.sign({ email: email }, JWT_SECRET);
+            return res.status(200).json({ message: 'User logged in successfully', token: token });
+          }
+          else{
+            return res.status(401).json({ message: 'Email or password is incorrect' });
+          }
+      }
+      else if(queryResult.rowCount===0){
+        await createUserTableIfNotExists();
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(email, salt);
+        // Insert the new user into the database
+        const insertUserQuery = 'INSERT INTO users (name, email, password) VALUES ($1, $2, $3)';
+        const values = [ name, email, hashedPassword];
+        await client.query(insertUserQuery, values);
+        const token = jwt.sign({ email: email }, JWT_SECRET);
+        return res.status(200).json({ message: 'User registered successfully', token: token });
+      }
+    }
+    catch(err){
+      console.error('Error logging in user:', err);
+      return res.status(500).json({ error: 'Error logging in user' });
+    }
+  }
 ];
