@@ -9,11 +9,9 @@ const createProjectsTableIfNotExists = async () => {
             ProjectID SERIAL PRIMARY KEY,
             AdminID INTEGER REFERENCES admins(AdminID) ON DELETE CASCADE,
             Title VARCHAR(255) NOT NULL,
-            Description TEXT NOT NULL,
             TargetAmount DECIMAL(15, 2) NOT NULL,
             StartDate DATE NOT NULL,
             EndDate DATE NOT NULL,
-            CompanyWorth DECIMAL(15, 2),
             TotalAmountInvested DECIMAL(15, 2) DEFAULT 0,
             ROI DECIMAL(5, 2), -- Return on Investment, can store percentages
             TotalRevenueGenerated DECIMAL(15, 2) DEFAULT 0,
@@ -37,11 +35,9 @@ exports.addProject = [
     // Validation checks
     body('adminID').isInt().withMessage('AdminID must be an integer'),
     body('title').notEmpty().withMessage('Title is required'),
-    body('description').notEmpty().withMessage('Description is required'),
     body('targetAmount').isDecimal().withMessage('Target amount must be a decimal value'),
     body('startDate').isDate().withMessage('Start date is required'),
     body('endDate').isDate().withMessage('End date is required'),
-    body('companyWorth').optional().isDecimal().withMessage('Company worth must be a decimal value'),
     body('totalAmountInvested').optional().isDecimal().withMessage('Total amount invested must be a decimal value'),
     body('roi').optional().isDecimal().withMessage('ROI must be a decimal value'),
     body('totalRevenueGenerated').optional().isDecimal().withMessage('Total revenue generated must be a decimal value'),
@@ -60,10 +56,10 @@ exports.addProject = [
         try {
             await createProjectsTableIfNotExists();
             const insertProjectQuery = `
-                INSERT INTO projects (AdminID, Title, Description, TargetAmount, StartDate, EndDate, CompanyWorth, TotalAmountInvested, ROI, TotalRevenueGenerated, Status)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                INSERT INTO projects (AdminID, Title, TargetAmount, StartDate, EndDate, TotalAmountInvested, ROI, TotalRevenueGenerated, Status)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             `;
-            const values = [adminID, title, description, targetAmount, startDate, endDate, companyWorth || null, totalAmountInvested || 0, roi || null, totalRevenueGenerated || 0, status || 'Active'];
+            const values = [adminID, title, targetAmount, startDate, endDate, totalAmountInvested || 0, roi || null, totalRevenueGenerated || 0, status || 'Active'];
             await client.query(insertProjectQuery, values);
 
             // Send success response
@@ -82,12 +78,10 @@ exports.getAllProjects = async (req, res) => {
         const query = `
             SELECT 
                 p.ProjectID, 
-                p.Title, 
-                p.Description, 
+                p.Title,
                 p.TargetAmount, 
                 p.StartDate, 
-                p.EndDate, 
-                p.CompanyWorth, 
+                p.EndDate,
                 p.TotalAmountInvested, 
                 p.ROI, 
                 p.TotalRevenueGenerated, 
@@ -109,69 +103,77 @@ exports.getAllProjects = async (req, res) => {
     }
 };
 
-const createPerformanceTable = async () => {
-    const createTableQuery = `
-      CREATE TABLE IF NOT EXISTS Performance (
-        PerformanceID SERIAL PRIMARY KEY,
-        ProjectID INT REFERENCES Projects(ProjectID),
-        Year SERIAL,
-        CashOut NUMERIC,
-        CashIn NUMERIC
-      );
-    `;
-    try {
-      await client.query(createTableQuery);
-      console.log('Performance table is ready');
-    } catch (error) {
-      console.error('Error creating table:', error);
-    }
-  };
-
-exports.addPerformance = async (req, res) => {
-    const { projectID, cashOut, cashIn } = req.body;
-  
-    if (!projectID || !cashOut || !cashIn) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-  
-    try {
-      await createPerformanceTable();
-      const insertQuery = `
-        INSERT INTO Performance (ProjectID, CashOut, CashIn)
-        VALUES ($1, $2, $3)
-        RETURNING *;
-      `;
-      const result = await client.query(insertQuery, [projectID, cashOut, cashIn]);
-      return res.status(201).json({ performance: result.rows[0] });
-    } catch (error) {
-      console.error('Error adding performance entry:', error);
-      return res.status(500).json({ error: 'Failed to add performance entry' });
-    }
+const createCashFlowTable = async () => {
+  const createTableQuery = `
+    CREATE TABLE IF NOT EXISTS CashFlow (
+      CashFlowID SERIAL PRIMARY KEY,
+      ProjectID INT REFERENCES Projects(ProjectID),
+      Year INT,
+      CashIn NUMERIC,
+      CashOut NUMERIC,
+      netCashFlow NUMERIC
+    );
+  `;
+  try {
+    await client.query(createTableQuery);
+    console.log('CashFlow table is ready');
+  } catch (error) {
+    console.error('Error creating table:', error);
+  }
 };
 
-exports.getPerformanceByProjectID = [
-    body('projectID').isInt().withMessage('ProjectID must be an integer'),
-  
-    async (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-      const { projectID } = req.body;
-      try {
-        const selectQuery = `
-          SELECT * FROM Performance WHERE ProjectID = $1;
-        `;
-        const result = await client.query(selectQuery, [projectID]);
-  
-        if (result.rows.length === 0) {
-          return res.status(404).json({ message: 'No performance records found for this project' });
-        }
-  
-        return res.status(200).json({ performance: result.rows });
-      } catch (error) {
-        console.error('Error fetching performance entries:', error.message);
-        return res.status(500).json({ error: 'Failed to fetch performance entries' });
-      }
+exports.addCashFlow = [
+  body('projectID').isInt().withMessage('ProjectID must be an integer'),
+  body('year').isInt().withMessage('Year must be an integer'),
+  body('cashIn').isDecimal().withMessage('CashIn must be a decimal value'),
+  body('cashOut').isDecimal().withMessage('CashOut must be a decimal value'),
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
     }
-  ];
+
+    const { projectID, year, cashIn, cashOut } = req.body;
+    const netCashFlow = cashIn - cashOut;
+
+    try {
+      await createCashFlowTable();
+      const insertQuery = `
+        INSERT INTO CashFlow (ProjectID, Year, CashIn, CashOut, netCashFlow)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING *;
+      `;
+      const result = await client.query(insertQuery, [projectID, year, cashIn, cashOut, netCashFlow]);
+      return res.status(201).json({ message: "Cash flow added successfully", cashFlow: result.rows[0] });
+    } catch (error) {
+      console.error('Error adding cashFlow entry:', error);
+      return res.status(500).json({ error: 'Failed to add cashFlow entry' });
+    }
+  }
+];
+
+exports.getCashFlow = [
+  body('projectID').notEmpty().withMessage('ProjectID is required').isInt().withMessage('ProjectID must be an integer'),
+  
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    const { projectID } = req.body;
+    try {
+      const selectQuery = `
+        SELECT * FROM CashFlow WHERE ProjectID = $1; 
+      `;
+      const result = await client.query(selectQuery, [projectID]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: 'No cash flow records found for this project' });
+      }
+      return res.status(200).json({ cashFlow: result.rows });
+    } catch (error) {
+      console.error('Error fetching cash flow entries:', error.message);
+      return res.status(500).json({ error: 'Failed to fetch cash flow entries' });
+    }
+  }
+];
