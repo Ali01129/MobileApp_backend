@@ -102,6 +102,7 @@ exports.login = [
         const queryResult = await client.query(query, [email]);
   
         if (queryResult.rowCount === 1) {
+          const userinfo=queryResult.rows[0];
           const pass = queryResult.rows[0].password;
           const result = await bcrypt.compare(password, pass);
   
@@ -109,7 +110,7 @@ exports.login = [
             // Creating token
             const token = jwt.sign({ email: email }, JWT_SECRET);
             // Sending data
-            return res.status(200).json({ message: 'User logged in successfully', token: token });
+            return res.status(200).json({ message: 'User logged in successfully', token: token,user:{name:userinfo.name,email:userinfo.email,totalinvested:userinfo.totalinvested,totalprofit:userinfo.totalprofit,totalloss:userinfo.totalloss} });
           } else {
             return res.status(401).json({ message: 'Email or password is incorrect' });
           }
