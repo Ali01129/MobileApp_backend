@@ -12,7 +12,7 @@ const fetchUser = (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
-        req.userMail = decoded;
+        req.userMail = decoded.email;
         next();
     } catch (err) {
         console.error('Token verification failed:', err);
