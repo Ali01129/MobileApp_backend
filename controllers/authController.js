@@ -135,13 +135,14 @@ exports.googleAuth=[
       // Checking if the user exists
       const query = 'SELECT * FROM users WHERE email=$1';
       const queryResult = await client.query(query, [email]);
-
+      //login
       if(queryResult.rowCount===1){
-        const pass = queryResult.rows[0].password;
+          const userinfo=queryResult.rows[0];
+          const pass = queryResult.rows[0].password;
           const result = await bcrypt.compare(email, pass);
           if (result) {
             const token = jwt.sign({ email: email }, JWT_SECRET);
-            return res.status(200).json({ message: 'User logged in successfully', token: token });
+            return res.status(200).json({ message: 'User logged in successfully', token: token ,user:{name:userinfo.name,email:userinfo.email,totalinvested:userinfo.totalinvested,totalprofit:userinfo.totalprofit,totalloss:userinfo.totalloss}});
           }
           else{
             return res.status(401).json({ message: 'Email or password is incorrect' });
@@ -151,12 +152,17 @@ exports.googleAuth=[
         await createUserTableIfNotExists();
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(email, salt);
-        // Insert the new user into the database
         const insertUserQuery = 'INSERT INTO users (name, email, password) VALUES ($1, $2, $3)';
         const values = [ name, email, hashedPassword];
         await client.query(insertUserQuery, values);
         const token = jwt.sign({ email: email }, JWT_SECRET);
-        return res.status(200).json({ message: 'User registered successfully', token: token });
+        //fetching user info
+        const query = 'SELECT * FROM users WHERE email=$1';
+        const queryResult = await client.query(query, [email]);
+        if(queryResult.rowCount===1){
+          const userinfo=queryResult.rows[0];
+        }
+        return res.status(200).json({ message: 'User registered successfully', token: token ,user:{name:userinfo.name,email:userinfo.email,totalinvested:userinfo.totalinvested,totalprofit:userinfo.totalprofit,totalloss:userinfo.totalloss} });
       }
     }
     catch(err){
