@@ -110,7 +110,7 @@ exports.login = [
             // Creating token
             const token = jwt.sign({ email: email }, JWT_SECRET);
             // Sending data
-            return res.status(200).json({ message: 'User logged in successfully', token: token,user:{name:userinfo.name,email:userinfo.email,totalinvested:userinfo.totalinvested,totalprofit:userinfo.totalprofit,totalloss:userinfo.totalloss} });
+            return res.status(200).json({ message: 'User logged in successfully', token: token,user:{name:userinfo.name,email:userinfo.email,dob:userinfo.dob,totalinvested:userinfo.totalinvested,totalprofit:userinfo.totalprofit,totalloss:userinfo.totalloss} });
           } else {
             return res.status(401).json({ message: 'Email or password is incorrect' });
           }
@@ -142,7 +142,7 @@ exports.googleAuth=[
           const result = await bcrypt.compare(email, pass);
           if (result) {
             const token = jwt.sign({ email: email }, JWT_SECRET);
-            return res.status(200).json({ message: 'User logged in successfully', token: token ,user:{name:userinfo.name,email:userinfo.email,totalinvested:userinfo.totalinvested,totalprofit:userinfo.totalprofit,totalloss:userinfo.totalloss}});
+            return res.status(200).json({ message: 'User logged in successfully', token: token ,user:{name:userinfo.name,email:userinfo.email,dob:userinfo.dob,totalinvested:userinfo.totalinvested,totalprofit:userinfo.totalprofit,totalloss:userinfo.totalloss}});
           }
           else{
             return res.status(401).json({ message: 'Email or password is incorrect' });
