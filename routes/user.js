@@ -6,8 +6,6 @@ const router=express.Router();
 router.patch('/update',fetchUser,userController.updateUser);
 router.get('/profile',fetchUser,userController.profile);
 router.post('/changePassword',fetchUser,userController.changePassword);
-router.delete('/delete',fetchUser,userController.deleteUser);
+router.patch('/delete',fetchUser,userController.deleteUser);
 router.post('/reportIssue',fetchUser,userController.reportIssue);
-router.get('/getIssues',userController.getIssues);
-
 module.exports=router;

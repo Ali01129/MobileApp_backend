@@ -20,6 +20,7 @@ const createUserTableIfNotExists = async () => {
       nationalID VARCHAR(50), -- SSN / Passport / National ID
       profileStatus BOOLEAN DEFAULT FALSE, -- false means not completed
       accountStatus BOOLEAN DEFAULT TRUE, -- true means active
+      accountDeleted BOOLEAN DEFAULT FALSE, -- true means deleted
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );`;
     try {
@@ -55,7 +56,10 @@ exports.register = [
       const userCheckResult = await client.query(userCheckQuery, [email]);
 
       if (userCheckResult.rows.length > 0) {
-        return res.status(400).json({ message: 'User already exists' });
+        if(userCheckResult.rows[0].accountdeleted==true || userCheckResult.rows[0].accountstatus==false){
+          return res.status(400).json({message:'Your account has been Deleted or Banned. If you want to reopen your account, please contact support.'});
+        }
+        return res.status(400).json({ message: 'User already exists'});
       }
 
       // Hash the password before saving it to the database
@@ -98,7 +102,7 @@ exports.login = [
   
       try {
         // Checking if the user with the email exists
-        const query = 'SELECT * FROM users WHERE email=$1';
+        const query = 'SELECT * FROM users WHERE email=$1 AND accountDeleted != true AND accountstatus != false';
         const queryResult = await client.query(query, [email]);
   
         if (queryResult.rowCount === 1) {
@@ -138,6 +142,9 @@ exports.googleAuth=[
       //login
       if(queryResult.rowCount===1){
           const userinfo=queryResult.rows[0];
+          if(userinfo.accountdeleted==true || userinfo.accountstatus==false){
+            return res.status(400).json({message:'Your account has been Deleted or Banned. If you want to reopen your account, please contact support.'});
+          }
           const pass = queryResult.rows[0].password;
           const result = await bcrypt.compare(email, pass);
           if (result) {

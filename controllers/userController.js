@@ -117,16 +117,18 @@ exports.deleteUser = async (req, res) => {
             return res.status(404).json({ error: 'User not found.' });
         }
 
-        // Proceed with deletion
-        const deleteQuery = `DELETE FROM users WHERE email = $1`;
-        await client.query(deleteQuery, [req.userMail]);
-        return res.status(200).json({ message: 'Account deleted successfully.' });
+        // Update accountDeleted to true
+        const updateQuery = `UPDATE users SET accountDeleted = TRUE WHERE email = $1`;
+        await client.query(updateQuery, [req.userMail]);
+
+        return res.status(200).json({ message: 'Account marked as deleted successfully.' });
 
     } catch (err) {
-        console.error('Error deleting account:', err);
+        console.error('Error marking account as deleted:', err);
         return res.status(500).json({ error: 'Internal server error. Please try again later.' });
     }
 };
+
 
 const CreateIssueTable = async () => {
     const createTableQuery = `
@@ -156,18 +158,6 @@ exports.reportIssue = async (req, res) => {
         return res.status(200).json({ message: 'Issue reported successfully' });
     } catch (err) {
         console.error('Error reporting issue:', err);
-        return res.status(500).json({ error: 'Internal server error. Please try again later.' });
-    }
-};
-
-//see all issues
-exports.getIssues=async(req,res)=>{
-    try {
-        const query = `SELECT * FROM issues`;
-        const result = await client.query(query);
-        return res.status(200).json(result.rows);
-    } catch (err) {
-        console.error(err);
         return res.status(500).json({ error: 'Internal server error. Please try again later.' });
     }
 };
